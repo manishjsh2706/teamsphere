@@ -22,6 +22,9 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
+// ✅ Auth routes connected here
+app.use('/api/auth', require('./routes/authRoutes'))
+
 // 6. Test route
 app.get('/', (req, res) => {
   res.json({ message: 'TeamSphere API is running!' })
