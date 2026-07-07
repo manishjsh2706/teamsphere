@@ -277,6 +277,64 @@ const removeMember = async (req, res) => {
   }
 }
 
+// @desc    Change member role in project
+// @route   PUT /api/projects/:id/members/:userId/role
+// @access  Private (project owner only)
+const changeMemberRole = async (req, res) => {
+  try {
+    const { role } = req.body
+
+    // Validate role value
+    if (!role || !['admin', 'member'].includes(role)) {
+      return res.status(400).json({
+        message: 'Role must be either admin or member',
+      })
+    }
+
+    const project = await Project.findById(req.params.id)
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' })
+    }
+
+    // Only project owner can change roles
+    const isOwner =
+      project.owner.toString() === req.user._id.toString()
+    const isSystemAdmin = req.user.role === 'admin'
+
+    if (!isOwner && !isSystemAdmin) {
+      return res.status(403).json({
+        message: 'Only project owner can change member roles',
+      })
+    }
+
+    // Cannot change owner's role
+    if (project.owner.toString() === req.params.userId) {
+      return res.status(400).json({
+        message: 'Cannot change project owner role',
+      })
+    }
+
+    // Find and update member role
+    const memberIndex = project.members.findIndex(
+      (m) => m.user.toString() === req.params.userId
+    )
+
+    if (memberIndex === -1) {
+      return res.status(404).json({ message: 'Member not found in project' })
+    }
+
+    project.members[memberIndex].role = role
+    await project.save()
+    await project.populate('owner', 'name email avatar')
+    await project.populate('members.user', 'name email avatar')
+
+    res.json(project)
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// Update module.exports to include new function
 module.exports = {
   createProject,
   getProjects,
@@ -285,4 +343,5 @@ module.exports = {
   deleteProject,
   addMember,
   removeMember,
+  changeMemberRole, // ✅ NEW
 }

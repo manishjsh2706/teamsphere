@@ -8,6 +8,7 @@ const {
   deleteProject,
   addMember,
   removeMember,
+  changeMemberRole, // ✅ ADD THIS
 } = require('../controllers/projectController')
 const {
   createTask,
@@ -38,6 +39,10 @@ router.route('/:id/members')
 
 router.route('/:id/members/:userId')
   .delete(removeMember)  // DELETE /api/projects/:id/members/:userId
+
+// Change member role
+router.route('/:id/members/:userId/role')
+  .put(changeMemberRole)  // PUT /api/projects/:id/members/:userId/role
 
 // Task routes (nested under projects)
 router.route('/:id/tasks')

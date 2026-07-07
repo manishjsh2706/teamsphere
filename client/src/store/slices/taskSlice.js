@@ -71,6 +71,24 @@ export const deleteTask = createAsyncThunk(
   }
 )
 
+// Update a task
+export const updateTask = createAsyncThunk(
+  'tasks/update',
+  async ({ projectId, taskId, taskData }, { rejectWithValue }) => {
+    try {
+      const { data } = await API.put(
+        `/projects/${projectId}/tasks/${taskId}`,
+        taskData
+      )
+      return data
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to update task'
+      )
+    }
+  }
+)
+
 // ─────────────────────────────────────────
 // INITIAL STATE
 // tasks is an object with 4 columns
@@ -164,6 +182,39 @@ const taskSlice = createSlice({
           )
         })
       })
+
+      // ── UPDATE TASK ──
+.addCase(updateTask.pending, (state) => {
+  state.loading = true
+  state.error = null
+})
+.addCase(updateTask.fulfilled, (state, action) => {
+  state.loading = false
+  state.success = true
+  const updatedTask = action.payload
+
+  // Find which column this task is in and update it
+  Object.keys(state.tasks).forEach((status) => {
+    const taskIndex = state.tasks[status].findIndex(
+      (t) => t._id === updatedTask._id
+    )
+    if (taskIndex !== -1) {
+      if (updatedTask.status === status) {
+        // Task stayed in same column — just update it
+        state.tasks[status][taskIndex] = updatedTask
+      } else {
+        // Task moved to different column — remove from old column
+        state.tasks[status].splice(taskIndex, 1)
+        // Add to new column
+        state.tasks[updatedTask.status].push(updatedTask)
+      }
+    }
+  })
+})
+.addCase(updateTask.rejected, (state, action) => {
+  state.loading = false
+  state.error = action.payload
+})
   },
 })
 
