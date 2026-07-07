@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import {
   fetchProjects,
@@ -9,25 +8,46 @@ import {
   clearProjectSuccess,
 } from '../../store/slices/projectSlice'
 import Navbar from '../../components/Navbar'
+import ProjectCard from '../../components/ProjectCard'
+import { validateProjectName } from '../../utils/validation'
 
 const Dashboard = () => {
   const dispatch = useDispatch()
-  const navigate = useNavigate()
 
   const { projects, loading, error, success } =
     useSelector((state) => state.projects)
 
+  // Show or hide create project form
   const [showForm, setShowForm] = useState(false)
+
+  // Create project form data
   const [projectData, setProjectData] = useState({
     name: '',
     description: '',
     color: '#3B82F6',
   })
 
+  // Create project form errors
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+  })
+
+  // Color options
+  const colors = [
+    '#3B82F6', '#10B981', '#F59E0B',
+    '#EF4444', '#8B5CF6', '#EC4899',
+  ]
+
+  // ─────────────────────────────────────────
+  // EFFECTS
+  // ─────────────────────────────────────────
+
+  // Fetch projects when page loads
   useEffect(() => {
     dispatch(fetchProjects())
   }, [dispatch])
 
+  // Show errors
   useEffect(() => {
     if (error) {
       toast.error(error)
@@ -35,40 +55,56 @@ const Dashboard = () => {
     }
   }, [error, dispatch])
 
+  // Hide form after successful project creation
   useEffect(() => {
-    if (success) {
+    if (success && showForm) {
       toast.success('Project created!')
       setShowForm(false)
       setProjectData({ name: '', description: '', color: '#3B82F6' })
+      setFormErrors({ name: '' })
       dispatch(clearProjectSuccess())
     }
-  }, [success, dispatch])
+  }, [success, showForm, dispatch])
+
+  // ─────────────────────────────────────────
+  // HANDLERS
+  // ─────────────────────────────────────────
 
   const handleChange = (e) => {
-    setProjectData({ ...projectData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setProjectData({ ...projectData, [name]: value })
+    if (name === 'name') {
+      setFormErrors({ name: '' })
+    }
   }
 
   const handleCreateProject = (e) => {
     e.preventDefault()
-    if (!projectData.name.trim()) {
-      toast.error('Project name is required')
+
+    // Validate project name
+    const nameError = validateProjectName(projectData.name)
+    if (nameError) {
+      setFormErrors({ name: nameError })
       return
     }
+
     dispatch(createProject(projectData))
   }
 
-  const colors = [
-    '#3B82F6', '#10B981', '#F59E0B',
-    '#EF4444', '#8B5CF6', '#EC4899',
-  ]
-
+  // ─────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <Navbar />
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '32px 24px',
+      }}>
 
-        {/* Header */}
+        {/* ── HEADER ── */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -76,10 +112,19 @@ const Dashboard = () => {
           marginBottom: '32px',
         }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '28px', color: 'var(--text-primary)' }}>
+            <h1 style={{
+              margin: 0,
+              fontSize: '28px',
+              color: 'var(--text-primary)',
+              fontWeight: '700',
+            }}>
               My Projects
             </h1>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>
+            <p style={{
+              margin: '4px 0 0',
+              color: 'var(--text-secondary)',
+              fontSize: '14px',
+            }}>
               {projects.length} project{projects.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -101,7 +146,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Create Project Form */}
+        {/* ── CREATE PROJECT FORM ── */}
         {showForm && (
           <div style={{
             background: 'var(--card-bg)',
@@ -111,19 +156,27 @@ const Dashboard = () => {
             boxShadow: 'var(--shadow)',
             border: '1px solid var(--border-color)',
           }}>
-            <h3 style={{ margin: '0 0 16px', color: 'var(--text-primary)' }}>
+            <h3 style={{
+              margin: '0 0 16px',
+              color: 'var(--text-primary)',
+              fontSize: '16px',
+              fontWeight: '600',
+            }}>
               Create New Project
             </h3>
+
             <form onSubmit={handleCreateProject}>
-              <div style={{ marginBottom: '16px' }}>
+
+              {/* Project name */}
+              <div style={{ marginBottom: '14px' }}>
                 <label style={{
                   display: 'block',
                   marginBottom: '6px',
                   fontWeight: '500',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   color: 'var(--text-primary)',
                 }}>
-                  Project Name *
+                  Project Name <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -134,7 +187,9 @@ const Dashboard = () => {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid var(--border-color)',
+                    border: formErrors.name
+                      ? '1.5px solid #ef4444'
+                      : '1px solid var(--border-color)',
                     borderRadius: '8px',
                     fontSize: '14px',
                     boxSizing: 'border-box',
@@ -142,14 +197,24 @@ const Dashboard = () => {
                     color: 'var(--text-primary)',
                   }}
                 />
+                {formErrors.name && (
+                  <p style={{
+                    margin: '4px 0 0',
+                    fontSize: '12px',
+                    color: '#ef4444',
+                  }}>
+                    ⚠ {formErrors.name}
+                  </p>
+                )}
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
+              {/* Description */}
+              <div style={{ marginBottom: '14px' }}>
                 <label style={{
                   display: 'block',
                   marginBottom: '6px',
                   fontWeight: '500',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   color: 'var(--text-primary)',
                 }}>
                   Description
@@ -170,16 +235,18 @@ const Dashboard = () => {
                     resize: 'vertical',
                     background: 'var(--input-bg)',
                     color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
                   }}
                 />
               </div>
 
+              {/* Color picker */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{
                   display: 'block',
                   marginBottom: '8px',
                   fontWeight: '500',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   color: 'var(--text-primary)',
                 }}>
                   Project Color
@@ -188,7 +255,9 @@ const Dashboard = () => {
                   {colors.map((color) => (
                     <div
                       key={color}
-                      onClick={() => setProjectData({ ...projectData, color })}
+                      onClick={() =>
+                        setProjectData({ ...projectData, color })
+                      }
                       style={{
                         width: '28px',
                         height: '28px',
@@ -198,12 +267,14 @@ const Dashboard = () => {
                         border: projectData.color === color
                           ? '3px solid var(--text-primary)'
                           : '3px solid transparent',
+                        flexShrink: 0,
                       }}
                     />
                   ))}
                 </div>
               </div>
 
+              {/* Buttons */}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   type="submit"
@@ -216,13 +287,22 @@ const Dashboard = () => {
                     borderRadius: '8px',
                     cursor: 'pointer',
                     fontWeight: '500',
+                    fontSize: '14px',
                   }}
                 >
                   {loading ? 'Creating...' : 'Create Project'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+                    setShowForm(false)
+                    setFormErrors({ name: '' })
+                    setProjectData({
+                      name: '',
+                      description: '',
+                      color: '#3B82F6',
+                    })
+                  }}
                   style={{
                     padding: '10px 24px',
                     background: 'transparent',
@@ -230,6 +310,7 @@ const Dashboard = () => {
                     border: '1px solid var(--border-color)',
                     borderRadius: '8px',
                     cursor: 'pointer',
+                    fontSize: '14px',
                   }}
                 >
                   Cancel
@@ -239,12 +320,17 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Projects Grid */}
-        {loading && !showForm ? (
-          <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
+        {/* ── PROJECTS GRID ── */}
+        {loading && projects.length === 0 ? (
+          <p style={{
+            color: 'var(--text-secondary)',
+            textAlign: 'center',
+            padding: '40px',
+          }}>
             Loading projects...
           </p>
         ) : projects.length === 0 ? (
+          // Empty state
           <div style={{
             textAlign: 'center',
             padding: '80px 20px',
@@ -253,10 +339,18 @@ const Dashboard = () => {
             border: '1px solid var(--border-color)',
           }}>
             <p style={{ fontSize: '48px', margin: '0 0 16px' }}>📋</p>
-            <h3 style={{ color: 'var(--text-primary)', margin: '0 0 8px' }}>
+            <h3 style={{
+              color: 'var(--text-primary)',
+              margin: '0 0 8px',
+              fontSize: '18px',
+            }}>
               No projects yet
             </h3>
-            <p style={{ color: 'var(--text-secondary)', margin: '0 0 24px' }}>
+            <p style={{
+              color: 'var(--text-secondary)',
+              margin: '0 0 24px',
+              fontSize: '14px',
+            }}>
               Create your first project to get started
             </p>
             <button
@@ -269,97 +363,24 @@ const Dashboard = () => {
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontWeight: '500',
+                fontSize: '14px',
               }}
             >
               Create Project
             </button>
           </div>
         ) : (
+          // Projects grid
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '20px',
           }}>
             {projects.map((project) => (
-              <div
+              <ProjectCard
                 key={project._id}
-                onClick={() => navigate(`/projects/${project._id}`)}
-                style={{
-                  background: 'var(--card-bg)',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  cursor: 'pointer',
-                  boxShadow: 'var(--shadow)',
-                  borderTop: `4px solid ${project.color}`,
-                  border: '1px solid var(--border-color)',
-                  borderTop: `4px solid ${project.color}`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow)'
-                }}
-              >
-                <h3 style={{
-                  margin: '0 0 8px',
-                  fontSize: '16px',
-                  color: 'var(--text-primary)',
-                }}>
-                  {project.name}
-                </h3>
-                <p style={{
-                  margin: '0 0 16px',
-                  fontSize: '13px',
-                  color: 'var(--text-secondary)',
-                  lineHeight: '1.5',
-                }}>
-                  {project.description || 'No description'}
-                </p>
-
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                  <div style={{ display: 'flex' }}>
-                    {project.members?.slice(0, 3).map((member, index) => (
-                      <div
-                        key={member._id}
-                        title={member.user?.name}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: project.color,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '11px',
-                          fontWeight: '600',
-                          marginLeft: index > 0 ? '-8px' : '0',
-                          border: '2px solid var(--card-bg)',
-                        }}
-                      >
-                        {member.user?.name?.charAt(0).toUpperCase()}
-                      </div>
-                    ))}
-                  </div>
-
-                  <span style={{
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    background: 'var(--bg-tertiary)',
-                    padding: '2px 8px',
-                    borderRadius: '99px',
-                  }}>
-                    {project.status}
-                  </span>
-                </div>
-              </div>
+                project={project}
+              />
             ))}
           </div>
         )}

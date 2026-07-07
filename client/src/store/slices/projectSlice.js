@@ -50,6 +50,23 @@ export const fetchProjectById = createAsyncThunk(
   }
 )
 
+// Delete a project
+export const deleteProject = createAsyncThunk(
+  'projects/delete',
+  async (projectId, { rejectWithValue }) => {
+    try {
+      await API.delete(`/projects/${projectId}`)
+      return projectId
+      // Return the deleted project's ID
+      // so we can remove it from the list in reducer
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to delete project'
+      )
+    }
+  }
+)
+
 // Add member to project
 export const addMember = createAsyncThunk(
   'projects/addMember',
@@ -63,6 +80,24 @@ export const addMember = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || 'Failed to add member'
+      )
+    }
+  }
+)
+
+// Update a project
+export const updateProject = createAsyncThunk(
+  'projects/update',
+  async ({ projectId, projectData }, { rejectWithValue }) => {
+    try {
+      const { data } = await API.put(
+        `/projects/${projectId}`,
+        projectData
+      )
+      return data
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to update project'
       )
     }
   }
@@ -141,6 +176,24 @@ const projectSlice = createSlice({
         state.loading = false
         state.error = action.payload
       })
+      // ── DELETE PROJECT ──
+.addCase(deleteProject.pending, (state) => {
+  state.loading = true
+  state.error = null
+})
+.addCase(deleteProject.fulfilled, (state, action) => {
+  state.loading = false
+  state.success = true
+  // Remove deleted project from the list
+  // action.payload = the deleted project's ID
+  state.projects = state.projects.filter(
+    (p) => p._id !== action.payload
+  )
+})
+.addCase(deleteProject.rejected, (state, action) => {
+  state.loading = false
+  state.error = action.payload
+})
 
       // ── ADD MEMBER ──
       .addCase(addMember.pending, (state) => {
@@ -156,6 +209,26 @@ const projectSlice = createSlice({
         state.loading = false
         state.error = action.payload
       })
+      // ── UPDATE PROJECT ──
+.addCase(updateProject.pending, (state) => {
+  state.loading = true
+  state.error = null
+})
+.addCase(updateProject.fulfilled, (state, action) => {
+  state.loading = false
+  state.success = true
+  // Update project in the list
+  const index = state.projects.findIndex(
+    (p) => p._id === action.payload._id
+  )
+  if (index !== -1) {
+    state.projects[index] = action.payload
+  }
+})
+.addCase(updateProject.rejected, (state, action) => {
+  state.loading = false
+  state.error = action.payload
+})
   },
 })
 
