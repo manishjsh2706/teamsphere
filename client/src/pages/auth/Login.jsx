@@ -3,6 +3,11 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { loginUser, clearError } from '../../store/slices/authSlice'
+import FormInput from '../../components/FormInput'
+import {
+  validateLoginForm,
+  isFormValid,
+} from '../../utils/validation'
 
 const Login = () => {
   const dispatch = useDispatch()
@@ -12,12 +17,25 @@ const Login = () => {
     (state) => state.auth
   )
 
+  // Form data
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
 
-  // Redirect to dashboard if already logged in
+  // Validation errors
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  })
+
+  // Track touched fields
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+  })
+
+  // Redirect after successful login
   useEffect(() => {
     if (user && success) {
       toast.success('Welcome back!')
@@ -25,7 +43,7 @@ const Login = () => {
     }
   }, [user, success, navigate])
 
-  // Show error toast
+  // Show backend errors
   useEffect(() => {
     if (error) {
       toast.error(error)
@@ -33,15 +51,41 @@ const Login = () => {
     }
   }, [error, dispatch])
 
+  // Handle input change with real time validation
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+
+    if (touched[name]) {
+      const newErrors = validateLoginForm({ ...formData, [name]: value })
+      setErrors((prev) => ({ ...prev, [name]: newErrors[name] }))
+    }
   }
 
+  // Validate on blur (when user leaves field)
+  const handleBlur = (e) => {
+    const { name } = e.target
+    setTouched((prev) => ({ ...prev, [name]: true }))
+    const newErrors = validateLoginForm(formData)
+    setErrors((prev) => ({ ...prev, [name]: newErrors[name] }))
+  }
+
+  // Handle form submit
   const handleSubmit = (e) => {
     e.preventDefault()
+
+    // Touch all fields to show all errors
+    setTouched({ email: true, password: true })
+
+    // Validate all fields
+    const validationErrors = validateLoginForm(formData)
+    setErrors(validationErrors)
+
+    if (!isFormValid(validationErrors)) {
+      toast.error('Please fix the errors before submitting')
+      return
+    }
+
     dispatch(loginUser(formData))
   }
 
@@ -51,68 +95,71 @@ const Login = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f3f4f6'
+      background: 'var(--bg-primary)',
     }}>
       <div style={{
-        background: 'white',
+        background: 'var(--card-bg)',
         padding: '40px',
         borderRadius: '12px',
         width: '100%',
         maxWidth: '420px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        boxShadow: 'var(--shadow)',
+        border: '1px solid var(--border-color)',
       }}>
-        <h2 style={{ marginBottom: '8px', fontSize: '24px' }}>
-          Welcome Back
-        </h2>
-        <p style={{ color: '#6b7280', marginBottom: '24px' }}>
-          Login to TeamSphere
-        </p>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="john@example.com"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+        {/* Header */}
+        <div style={{ marginBottom: '28px', textAlign: 'center' }}>
+          <h1 style={{
+            margin: '0 0 4px',
+            fontSize: '26px',
+            fontWeight: '700',
+            color: 'var(--text-primary)',
+          }}>
+            Team<span style={{ color: '#3b82f6' }}>Sphere</span>
+          </h1>
+          <h2 style={{
+            margin: '0 0 4px',
+            fontSize: '20px',
+            color: 'var(--text-primary)',
+            fontWeight: '600',
+          }}>
+            Welcome Back
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '13px' }}>
+            Login with your @teamsphere.com account
+          </p>
+        </div>
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} noValidate>
 
+          {/* Email field */}
+          <FormInput
+            label="Email Address"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="john@teamsphere.com"
+            error={touched.email ? errors.email : ''}
+            required
+          />
+
+          {/* Password field */}
+          <FormInput
+            label="Password"
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="Enter your password"
+            error={touched.password ? errors.password : ''}
+            required
+          />
+
+          {/* Submit button */}
           <button
             type="submit"
             disabled={loading}
@@ -123,18 +170,28 @@ const Login = () => {
               color: 'white',
               border: 'none',
               borderRadius: '8px',
-              fontSize: '16px',
+              fontSize: '15px',
               fontWeight: '500',
               cursor: loading ? 'not-allowed' : 'pointer',
+              marginTop: '8px',
             }}
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', color: '#6b7280' }}>
+        {/* Register link */}
+        <p style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          color: 'var(--text-secondary)',
+          fontSize: '14px',
+        }}>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#3b82f6', fontWeight: '500' }}>
+          <Link
+            to="/register"
+            style={{ color: '#3b82f6', fontWeight: '500' }}
+          >
             Register here
           </Link>
         </p>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { validateEmail } from '../../utils/validation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   fetchTasks,
@@ -218,24 +219,29 @@ const Board = () => {
 
   // Handle inviting a member to project
   const handleInvite = (e) => {
-    e.preventDefault()
-    if (!inviteEmail.trim()) return
+  e.preventDefault()
 
-    dispatch(addMember({
-      projectId,
-      email: inviteEmail,
-      role: 'member',
-    }))
-      .unwrap()
-      .then(() => {
-        toast.success('Member invited successfully!')
-        setInviteEmail('')
-        setShowInvite(false)
-        // Refresh project to show new member avatar
-        dispatch(fetchProjectById(projectId))
-      })
-      .catch((err) => toast.error(err))
+  // Validate email before sending
+  const emailError = validateEmail(inviteEmail)
+  if (emailError) {
+    toast.error(emailError)
+    return
   }
+
+  dispatch(addMember({
+    projectId,
+    email: inviteEmail,
+    role: 'member',
+  }))
+    .unwrap()
+    .then(() => {
+      toast.success('Member invited successfully!')
+      setInviteEmail('')
+      setShowInvite(false)
+      dispatch(fetchProjectById(projectId))
+    })
+    .catch((err) => toast.error(err))
+}
 
   // ─────────────────────────────────────────
   // LOADING STATE

@@ -3,26 +3,44 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { registerUser, clearError } from '../../store/slices/authSlice'
+import FormInput from '../../components/FormInput'
+import {
+  validateRegisterForm,
+  isFormValid,
+} from '../../utils/validation'
 
 const Register = () => {
   const dispatch = useDispatch()
-  // dispatch is how we send actions to Redux store
-  // Like a remote control for the store
-
   const navigate = useNavigate()
 
-  // Read auth state from Redux store
   const { loading, error, user, success } = useSelector(
     (state) => state.auth
   )
 
+  // Form data state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   })
 
-  // If user is already logged in → redirect to dashboard
+  // Validation errors state
+  // Each key matches a form field
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    password: '',
+  })
+
+  // Track if user has touched each field
+  // We only show errors after user has interacted with a field
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    password: false,
+  })
+
+  // Redirect to dashboard after successful register
   useEffect(() => {
     if (user && success) {
       toast.success('Account created successfully!')
@@ -30,26 +48,63 @@ const Register = () => {
     }
   }, [user, success, navigate])
 
-  // Show error from Redux store as toast
+  // Show backend error as toast
   useEffect(() => {
     if (error) {
       toast.error(error)
       dispatch(clearError())
-      // Clear error from store after showing it
     }
   }, [error, dispatch])
 
+  // Handle input change
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    const { name, value } = e.target
+
+    // Update form data
+    setFormData({ ...formData, [name]: value })
+
+    // Validate this field in real time
+    // but only if user has already touched it
+    if (touched[name]) {
+      const newErrors = validateRegisterForm({
+        ...formData,
+        [name]: value,
+      })
+      setErrors((prev) => ({ ...prev, [name]: newErrors[name] }))
+    }
   }
 
+  // Mark field as touched when user leaves it
+  // This triggers validation for that field
+  const handleBlur = (e) => {
+    const { name } = e.target
+
+    // Mark as touched
+    setTouched((prev) => ({ ...prev, [name]: true }))
+
+    // Validate this specific field
+    const newErrors = validateRegisterForm(formData)
+    setErrors((prev) => ({ ...prev, [name]: newErrors[name] }))
+  }
+
+  // Handle form submit
   const handleSubmit = (e) => {
     e.preventDefault()
-    // dispatch sends the registerUser action to Redux
-    // Redux handles the API call and state updates
+
+    // Mark all fields as touched so all errors show
+    setTouched({ name: true, email: true, password: true })
+
+    // Validate all fields
+    const validationErrors = validateRegisterForm(formData)
+    setErrors(validationErrors)
+
+    // Stop if any errors exist
+    if (!isFormValid(validationErrors)) {
+      toast.error('Please fix the errors before submitting')
+      return
+    }
+
+    // All valid — dispatch register action
     dispatch(registerUser(formData))
   }
 
@@ -59,91 +114,85 @@ const Register = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f3f4f6'
+      background: 'var(--bg-primary)',
     }}>
       <div style={{
-        background: 'white',
+        background: 'var(--card-bg)',
         padding: '40px',
         borderRadius: '12px',
         width: '100%',
         maxWidth: '420px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        boxShadow: 'var(--shadow)',
+        border: '1px solid var(--border-color)',
       }}>
-        <h2 style={{ marginBottom: '8px', fontSize: '24px' }}>
-          Create Account
-        </h2>
-        <p style={{ color: '#6b7280', marginBottom: '24px' }}>
-          Join TeamSphere today
-        </p>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Full Name
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              placeholder="John Doe"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+        {/* Header */}
+        <div style={{ marginBottom: '28px', textAlign: 'center' }}>
+          <h1 style={{
+            margin: '0 0 4px',
+            fontSize: '26px',
+            fontWeight: '700',
+            color: 'var(--text-primary)',
+          }}>
+            Team<span style={{ color: '#3b82f6' }}>Sphere</span>
+          </h1>
+          <h2 style={{
+            margin: '0 0 4px',
+            fontSize: '20px',
+            color: 'var(--text-primary)',
+            fontWeight: '600',
+          }}>
+            Create Account
+          </h2>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '13px' }}>
+            Only @teamsphere.com emails are allowed
+          </p>
+        </div>
 
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="john@example.com"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+        {/* Register Form */}
+        <form onSubmit={handleSubmit} noValidate>
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Min 6 characters"
-              minLength={6}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+          {/* Name field */}
+          <FormInput
+            label="Full Name"
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="John Doe"
+            error={touched.name ? errors.name : ''}
+            required
+          />
 
+          {/* Email field */}
+          <FormInput
+            label="Email Address"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="john@teamsphere.com"
+            error={touched.email ? errors.email : ''}
+            required
+          />
+
+          {/* Password field */}
+          <FormInput
+            label="Password"
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="Min 6 characters"
+            error={touched.password ? errors.password : ''}
+            required
+            minLength={6}
+          />
+
+          {/* Submit button */}
           <button
             type="submit"
             disabled={loading}
@@ -154,18 +203,28 @@ const Register = () => {
               color: 'white',
               border: 'none',
               borderRadius: '8px',
-              fontSize: '16px',
+              fontSize: '15px',
               fontWeight: '500',
               cursor: loading ? 'not-allowed' : 'pointer',
+              marginTop: '8px',
             }}
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', color: '#6b7280' }}>
+        {/* Login link */}
+        <p style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          color: 'var(--text-secondary)',
+          fontSize: '14px',
+        }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#3b82f6', fontWeight: '500' }}>
+          <Link
+            to="/login"
+            style={{ color: '#3b82f6', fontWeight: '500' }}
+          >
             Login here
           </Link>
         </p>
