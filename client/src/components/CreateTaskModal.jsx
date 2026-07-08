@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'react-toastify'
 import { createTask } from '../store/slices/taskSlice'
 import { validateTaskTitle } from '../utils/validation'
+import MemberSearch from './MemberSearch'
 
 const STATUS_OPTIONS = [
   { value: 'todo', label: 'Todo', color: '#64748b' },
@@ -355,43 +356,16 @@ const CreateTaskModal = ({ projectId, onClose }) => {
                 />
               </div>
 
-              {/* Assign To */}
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '6px',
-                    fontWeight: '500',
-                    fontSize: '13px',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  Assign To
-                </label>
-                <select
-                  name="assignedTo"
-                  value={formData.assignedTo}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '9px 10px',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    background: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="">👤 Unassigned</option>
-                  {currentProject?.members?.map((member) => (
-                    <option key={member.user?._id} value={member.user?._id}>
-                      {member.user?.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <MemberSearch
+    members={currentProject?.members}
+    value={formData.assignedTo}
+    onChange={(memberId) =>
+      setFormData({ ...formData, assignedTo: memberId })
+    }
+    label="Assign To"
+  />
+</div>
             </div>
 
             {/* ── ATTACHMENT NOTE ── */}

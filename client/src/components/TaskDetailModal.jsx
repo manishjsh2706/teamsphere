@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'react-toastify'
 import axios from 'axios'
 import { updateTask } from '../store/slices/taskSlice'
+import MemberSearch from './MemberSearch'
 
 const STATUS_OPTIONS = [
   { value: 'todo', label: 'Todo', color: '#64748b' },
@@ -523,91 +524,15 @@ useEffect(() => {
               )}
             </div>
 
-            {/* Assign To */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px',
-                }}
-              >
-                Assigned To
-              </label>
-              <select
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="">👤 Unassigned</option>
-                {currentProject?.members?.map((member) => (
-                  <option key={member.user?._id} value={member.user?._id}>
-                    {member.user?.name}
-                  </option>
-                ))}
-              </select>
-
-              {/* Current assignee info */}
-              {assignedTo && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginTop: '6px',
-                    padding: '6px 10px',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: '#3b82f6',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {currentProject?.members
-                      ?.find((m) => m.user?._id === assignedTo)
-                      ?.user?.name?.charAt(0)
-                      .toUpperCase()}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: '12px',
-                      color: 'var(--text-primary)',
-                      fontWeight: '500',
-                    }}
-                  >
-                    {currentProject?.members
-                      ?.find((m) => m.user?._id === assignedTo)
-                      ?.user?.name}
-                  </span>
-                </div>
-              )}
-            </div>
+           {/* Assign To — searchable */}
+<div>
+  <MemberSearch
+    members={currentProject?.members}
+    value={assignedTo}
+    onChange={(memberId) => setAssignedTo(memberId)}
+    label="Assigned To"
+  />
+</div>
           </div>
 
           {/* ── DESCRIPTION ── */}
