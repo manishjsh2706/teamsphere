@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { validateEmail } from '../../utils/validation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   fetchTasks,
-  createTask,
   moveTask,
   deleteTask,
   moveTaskLocally,
@@ -20,13 +18,13 @@ import {
 import Navbar from '../../components/Navbar'
 import MemberList from '../../components/MemberList'
 import TaskDetailModal from '../../components/TaskDetailModal'
+import CreateTaskModal from '../../components/CreateTaskModal'
 import useProjectRole from '../../hooks/useProjectRole'
+import { validateEmail } from '../../utils/validation'
 
 // ─────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────
-
-// Our 4 board columns — matches backend status values
 const COLUMNS = [
   { id: 'todo', label: 'Todo', color: '#64748b' },
   { id: 'in_progress', label: 'In Progress', color: '#3b82f6' },
@@ -34,7 +32,6 @@ const COLUMNS = [
   { id: 'done', label: 'Done', color: '#10b981' },
 ]
 
-// Colors for priority badges on task cards
 const PRIORITY_COLORS = {
   low: '#10b981',
   medium: '#f59e0b',
@@ -42,41 +39,22 @@ const PRIORITY_COLORS = {
   urgent: '#7c3aed',
 }
 
-// Priority buttons in the add task form
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Low', color: '#10b981' },
-  { value: 'medium', label: 'Medium', color: '#f59e0b' },
-  { value: 'high', label: 'High', color: '#ef4444' },
-  { value: 'urgent', label: 'Urgent', color: '#7c3aed' },
-]
-
 // ─────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────
 const Board = () => {
-
-  // Get project ID from URL
-  // Example: /projects/abc123 → projectId = "abc123"
   const { id: projectId } = useParams()
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-  // ─────────────────────────────────────────
-  // REDUX STATE
-  // ─────────────────────────────────────────
-
-  // Tasks grouped by status from Redux
+  // Redux state
   const { tasks, loading: tasksLoading, error: taskError } =
     useSelector((state) => state.tasks)
-
-  // Current project details from Redux
   const { currentProject, loading: projectLoading, error: projectError } =
     useSelector((state) => state.projects)
-
-  // Logged in user from Redux
   const { user } = useSelector((state) => state.auth)
 
-  // Role based permissions from custom hook
+  // Role based permissions
   const { canManageProject, canManageMembers, currentUserId } =
     useProjectRole()
 
@@ -84,39 +62,29 @@ const Board = () => {
   // LOCAL STATE
   // ─────────────────────────────────────────
 
-  // Which column's add task form is open
-  // null means all forms are closed
-  const [activeColumn, setActiveColumn] = useState(null)
+  // Show create task modal
+  const [showCreateTask, setShowCreateTask] = useState(false)
 
-  // New task form fields
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskPriority, setNewTaskPriority] = useState('medium')
-  const [newTaskAssignee, setNewTaskAssignee] = useState('')
-
-  // Show or hide invite member form
+  // Show invite member form
   const [showInvite, setShowInvite] = useState(false)
 
-  // Show or hide members panel
+  // Show members panel
   const [showMembers, setShowMembers] = useState(false)
 
-  // Email input for invite form
+  // Invite email input
   const [inviteEmail, setInviteEmail] = useState('')
 
-  // Selected task for detail modal
-  // null = modal closed, task object = modal open
+  // Selected task for detail/edit modal
   const [selectedTask, setSelectedTask] = useState(null)
 
   // ─────────────────────────────────────────
   // EFFECTS
   // ─────────────────────────────────────────
-
-  // Fetch project details and tasks when page loads
   useEffect(() => {
     dispatch(fetchProjectById(projectId))
     dispatch(fetchTasks(projectId))
   }, [dispatch, projectId])
 
-  // Show error messages as toast notifications
   useEffect(() => {
     if (taskError) {
       toast.error(taskError)
@@ -132,74 +100,32 @@ const Board = () => {
   // HANDLERS
   // ─────────────────────────────────────────
 
-  // Handle drag and drop between columns
+  // Drag and drop
   const handleDragEnd = (result) => {
     const { destination, source, draggableId } = result
-
-    // Dropped outside any column — do nothing
     if (!destination) return
-
-    // Dropped in same position — do nothing
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
     ) return
 
-    // Step 1 — Update UI instantly before backend confirms
-    // This makes drag and drop feel smooth and immediate
-    dispatch(
-      moveTaskLocally({
-        taskId: draggableId,
-        sourceStatus: source.droppableId,
-        destStatus: destination.droppableId,
-        sourceIndex: source.index,
-        destIndex: destination.index,
-      })
-    )
+    dispatch(moveTaskLocally({
+      taskId: draggableId,
+      sourceStatus: source.droppableId,
+      destStatus: destination.droppableId,
+      sourceIndex: source.index,
+      destIndex: destination.index,
+    }))
 
-    // Step 2 — Update backend in the background
-    dispatch(
-      moveTask({
-        projectId,
-        taskId: draggableId,
-        newStatus: destination.droppableId,
-        newPosition: destination.index,
-      })
-    )
+    dispatch(moveTask({
+      projectId,
+      taskId: draggableId,
+      newStatus: destination.droppableId,
+      newPosition: destination.index,
+    }))
   }
 
-  // Reset all new task form fields to default
-  const resetTaskForm = () => {
-    setNewTaskTitle('')
-    setNewTaskPriority('medium')
-    setNewTaskAssignee('')
-    setActiveColumn(null)
-  }
-
-  // Handle creating a new task
-  const handleAddTask = (columnId) => {
-    if (!newTaskTitle.trim()) {
-      toast.error('Task title is required')
-      return
-    }
-
-    dispatch(
-      createTask({
-        projectId,
-        taskData: {
-          title: newTaskTitle,
-          priority: newTaskPriority,
-          assignedTo: newTaskAssignee || null,
-          // null means unassigned
-        },
-      })
-    )
-
-    resetTaskForm()
-  }
-
-  // Check if current user can delete a specific task
-  // Task creator, project admin, or system admin can delete
+  // Check if user can delete a task
   const canDeleteTask = (task) => {
     if (!user) return false
     const isTaskCreator =
@@ -207,41 +133,32 @@ const Board = () => {
     return isTaskCreator || canManageProject
   }
 
-  // Handle deleting a task
+  // Delete task
   const handleDeleteTask = (taskId, e) => {
-    // stopPropagation prevents the click from
-    // also triggering the card click (which opens modal)
     e.stopPropagation()
     if (window.confirm('Delete this task?')) {
       dispatch(deleteTask({ projectId, taskId }))
     }
   }
 
-  // Handle inviting a member to project
+  // Invite member
   const handleInvite = (e) => {
-  e.preventDefault()
-
-  // Validate email before sending
-  const emailError = validateEmail(inviteEmail)
-  if (emailError) {
-    toast.error(emailError)
-    return
+    e.preventDefault()
+    const emailError = validateEmail(inviteEmail)
+    if (emailError) {
+      toast.error(emailError)
+      return
+    }
+    dispatch(addMember({ projectId, email: inviteEmail, role: 'member' }))
+      .unwrap()
+      .then(() => {
+        toast.success('Member invited successfully!')
+        setInviteEmail('')
+        setShowInvite(false)
+        dispatch(fetchProjectById(projectId))
+      })
+      .catch((err) => toast.error(err))
   }
-
-  dispatch(addMember({
-    projectId,
-    email: inviteEmail,
-    role: 'member',
-  }))
-    .unwrap()
-    .then(() => {
-      toast.success('Member invited successfully!')
-      setInviteEmail('')
-      setShowInvite(false)
-      dispatch(fetchProjectById(projectId))
-    })
-    .catch((err) => toast.error(err))
-}
 
   // ─────────────────────────────────────────
   // LOADING STATE
@@ -275,14 +192,12 @@ const Board = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '24px',
+          marginBottom: '20px',
         }}>
-
-          {/* Left side — back button + project color + project name */}
+          {/* Left — back + project name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               onClick={() => navigate('/dashboard')}
-              title="Back to dashboard"
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -295,8 +210,6 @@ const Board = () => {
             >
               ←
             </button>
-
-            {/* Project color dot */}
             <div style={{
               width: '16px',
               height: '16px',
@@ -304,8 +217,6 @@ const Board = () => {
               background: currentProject?.color || '#3b82f6',
               flexShrink: 0,
             }} />
-
-            {/* Project name */}
             <h1 style={{
               margin: 0,
               fontSize: '22px',
@@ -316,10 +227,8 @@ const Board = () => {
             </h1>
           </div>
 
-          {/* Right side — member avatars + invite button */}
+          {/* Right — member avatars + invite button */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-
-            {/* Clickable member avatars — opens members panel */}
             <div
               style={{ display: 'flex', cursor: 'pointer' }}
               onClick={() => setShowMembers(!showMembers)}
@@ -349,8 +258,6 @@ const Board = () => {
                   {member.user?.name?.charAt(0).toUpperCase()}
                 </div>
               ))}
-
-              {/* Show +N badge if more than 4 members */}
               {currentProject?.members?.length > 4 && (
                 <div style={{
                   width: '32px',
@@ -371,16 +278,15 @@ const Board = () => {
               )}
             </div>
 
-            {/* Invite Member button */}
-            {/* Only visible to project admins and owners */}
+            {/* Invite button — admins only */}
             {canManageMembers && (
               <button
                 onClick={() => setShowInvite(!showInvite)}
                 style={{
                   padding: '8px 16px',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '13px',
@@ -394,9 +300,82 @@ const Board = () => {
         </div>
 
         {/* ════════════════════════════════ */}
+        {/*    BOARD TOOLBAR (below header)  */}
+        {/* ════════════════════════════════ */}
+        {/* This is where the Create Task button lives */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px',
+          padding: '12px 16px',
+          background: 'var(--card-bg)',
+          borderRadius: '10px',
+          border: '1px solid var(--border-color)',
+        }}>
+          {/* Left — task counts per column */}
+          <div style={{
+            display: 'flex',
+            gap: '16px',
+            alignItems: 'center',
+          }}>
+            {COLUMNS.map((col) => (
+              <div
+                key={col.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: col.color,
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                }}>
+                  {col.label}:
+                </span>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)',
+                }}>
+                  {tasks[col.id]?.length || 0}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right — Create Task button */}
+          <button
+            onClick={() => setShowCreateTask(true)}
+            style={{
+              padding: '8px 18px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            + Create Task
+          </button>
+        </div>
+
+        {/* ════════════════════════════════ */}
         {/*          MEMBERS PANEL          */}
         {/* ════════════════════════════════ */}
-        {/* Shown when member avatars are clicked */}
         {showMembers && (
           <MemberList
             projectId={projectId}
@@ -407,14 +386,12 @@ const Board = () => {
         {/* ════════════════════════════════ */}
         {/*           INVITE FORM           */}
         {/* ════════════════════════════════ */}
-        {/* Only shown to project admins */}
         {showInvite && canManageMembers && (
           <div style={{
             background: 'var(--card-bg)',
             borderRadius: '10px',
             padding: '16px 20px',
             marginBottom: '20px',
-            boxShadow: 'var(--shadow)',
             border: '1px solid var(--border-color)',
             display: 'flex',
             gap: '12px',
@@ -434,10 +411,8 @@ const Board = () => {
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@example.com"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleInvite(e)
-                }}
+                placeholder="colleague@teamsphere.com"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleInvite(e) }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -447,6 +422,7 @@ const Board = () => {
                   boxSizing: 'border-box',
                   background: 'var(--input-bg)',
                   color: 'var(--text-primary)',
+                  outline: 'none',
                 }}
               />
             </div>
@@ -467,10 +443,7 @@ const Board = () => {
               Send Invite
             </button>
             <button
-              onClick={() => {
-                setShowInvite(false)
-                setInviteEmail('')
-              }}
+              onClick={() => { setShowInvite(false); setInviteEmail('') }}
               style={{
                 padding: '8px 16px',
                 background: 'transparent',
@@ -496,8 +469,6 @@ const Board = () => {
             gap: '16px',
             alignItems: 'start',
           }}>
-
-            {/* Render each of the 4 columns */}
             {COLUMNS.map((column) => (
               <div
                 key={column.id}
@@ -505,10 +476,10 @@ const Board = () => {
                   background: 'var(--column-bg)',
                   borderRadius: '12px',
                   padding: '12px',
-                  minHeight: '300px',
+                  minHeight: '400px',
                 }}
               >
-                {/* ── COLUMN HEADER ── */}
+                {/* Column header */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -521,14 +492,12 @@ const Board = () => {
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                    {/* Column status color dot */}
                     <div style={{
                       width: '10px',
                       height: '10px',
                       borderRadius: '50%',
                       background: column.color,
                     }} />
-                    {/* Column name */}
                     <span style={{
                       fontWeight: '600',
                       fontSize: '13px',
@@ -537,8 +506,6 @@ const Board = () => {
                       {column.label}
                     </span>
                   </div>
-
-                  {/* Task count badge */}
                   <span style={{
                     background: 'var(--card-bg)',
                     color: 'var(--text-secondary)',
@@ -551,8 +518,7 @@ const Board = () => {
                   </span>
                 </div>
 
-                {/* ── DROPPABLE AREA ── */}
-                {/* This area accepts dragged tasks */}
+                {/* Droppable area */}
                 <Droppable droppableId={column.id}>
                   {(provided, snapshot) => (
                     <div
@@ -560,7 +526,6 @@ const Board = () => {
                       {...provided.droppableProps}
                       style={{
                         minHeight: '100px',
-                        // Highlight column when dragging a task over it
                         background: snapshot.isDraggingOver
                           ? 'var(--drag-over-bg)'
                           : 'transparent',
@@ -569,7 +534,7 @@ const Board = () => {
                         padding: '4px',
                       }}
                     >
-                      {/* ── TASK CARDS ── */}
+                      {/* Task cards */}
                       {tasks[column.id]?.map((task, index) => (
                         <Draggable
                           key={task._id}
@@ -582,13 +547,11 @@ const Board = () => {
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                               onClick={() => setSelectedTask(task)}
-                              // ↑ Click opens the task detail modal
                               style={{
                                 background: 'var(--card-bg)',
                                 borderRadius: '8px',
                                 padding: '12px',
                                 marginBottom: '8px',
-                                // Bigger shadow while being dragged
                                 boxShadow: snapshot.isDragging
                                   ? '0 8px 24px rgba(0,0,0,0.2)'
                                   : 'var(--shadow)',
@@ -608,7 +571,7 @@ const Board = () => {
                                 {task.title}
                               </p>
 
-                              {/* Task description preview */}
+                              {/* Description preview */}
                               {task.description && (
                                 <p style={{
                                   margin: '0 0 8px',
@@ -622,15 +585,40 @@ const Board = () => {
                                   {task.description}
                                 </p>
                               )}
+                              {/* Due date on card */}
+{task.dueDate && (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginBottom: '6px',
+  }}>
+    <span style={{ fontSize: '11px' }}>📅</span>
+    <span style={{
+      fontSize: '11px',
+      color: new Date(task.dueDate) < new Date()
+        ? '#ef4444'
+        : 'var(--text-secondary)',
+      fontWeight: new Date(task.dueDate) < new Date()
+        ? '600'
+        : '400',
+    }}>
+      {new Date(task.dueDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })}
+      {new Date(task.dueDate) < new Date() ? ' ⚠' : ''}
+    </span>
+  </div>
+)}
 
-                              {/* ── TASK CARD FOOTER ── */}
+                              {/* Task footer */}
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 marginTop: '8px',
                               }}>
-
                                 {/* Priority badge */}
                                 <span style={{
                                   fontSize: '10px',
@@ -650,8 +638,7 @@ const Board = () => {
                                   alignItems: 'center',
                                   gap: '6px',
                                 }}>
-
-                                  {/* Assigned user avatar */}
+                                  {/* Assignee avatar */}
                                   {task.assignedTo && (
                                     <div
                                       title={`Assigned to: ${task.assignedTo.name}`}
@@ -676,7 +663,6 @@ const Board = () => {
                                   )}
 
                                   {/* Delete button */}
-                                  {/* Only shown if user has permission */}
                                   {canDeleteTask(task) && (
                                     <button
                                       onClick={(e) =>
@@ -691,8 +677,6 @@ const Board = () => {
                                         fontSize: '14px',
                                         padding: '0',
                                         lineHeight: '1',
-                                        display: 'flex',
-                                        alignItems: 'center',
                                       }}
                                     >
                                       ✕
@@ -704,198 +688,28 @@ const Board = () => {
                           )}
                         </Draggable>
                       ))}
-
-                      {/* Placeholder keeps column height while dragging */}
                       {provided.placeholder}
                     </div>
                   )}
                 </Droppable>
-
-                {/* ── ADD TASK SECTION ── */}
-                {activeColumn === column.id ? (
-                  // Form is open for this column
-                  <div style={{ marginTop: '8px' }}>
-
-                    {/* Task title input */}
-                    <input
-                      type="text"
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="Enter task title..."
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') resetTaskForm()
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        border: '2px solid #3b82f6',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        boxSizing: 'border-box',
-                        marginBottom: '8px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--text-primary)',
-                      }}
-                    />
-
-                    {/* Priority selector buttons */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '5px',
-                      }}>
-                        Priority
-                      </label>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        {PRIORITY_OPTIONS.map((p) => (
-                          <button
-                            key={p.value}
-                            onClick={() => setNewTaskPriority(p.value)}
-                            style={{
-                              flex: 1,
-                              padding: '5px 4px',
-                              fontSize: '11px',
-                              fontWeight: '500',
-                              border: `1.5px solid ${p.color}`,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              // Filled when selected, transparent when not
-                              background: newTaskPriority === p.value
-                                ? p.color
-                                : 'transparent',
-                              color: newTaskPriority === p.value
-                                ? 'white'
-                                : p.color,
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Assign To dropdown */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '5px',
-                      }}>
-                        Assign To
-                      </label>
-                      <select
-                        value={newTaskAssignee}
-                        onChange={(e) => setNewTaskAssignee(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '7px 10px',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          background: 'var(--input-bg)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                          boxSizing: 'border-box',
-                        }}
-                      >
-                        {/* Default option */}
-                        <option value=''>👤 Unassigned</option>
-
-                        {/* All project members as options */}
-                        {currentProject?.members?.map((member) => (
-                          <option
-                            key={member.user?._id}
-                            value={member.user?._id}
-                          >
-                            {member.user?.name}
-                            {member.user?._id === currentUserId
-                              ? ' (you)'
-                              : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Add Task and Cancel buttons */}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => handleAddTask(column.id)}
-                        style={{
-                          flex: 1,
-                          padding: '7px',
-                          background: '#3b82f6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                        }}
-                      >
-                        Add Task
-                      </button>
-                      <button
-                        onClick={resetTaskForm}
-                        style={{
-                          padding: '7px 10px',
-                          background: 'transparent',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Add task button — shown when form is closed
-                  <button
-                    onClick={() => setActiveColumn(column.id)}
-                    style={{
-                      width: '100%',
-                      marginTop: '8px',
-                      padding: '8px',
-                      background: 'transparent',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      color: 'var(--text-tertiary)',
-                      fontSize: '13px',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background =
-                        'var(--drag-over-bg)'
-                      e.currentTarget.style.color =
-                        'var(--text-secondary)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.color = 'var(--text-tertiary)'
-                    }}
-                  >
-                    + Add a task
-                  </button>
-                )}
               </div>
             ))}
           </div>
         </DragDropContext>
 
         {/* ════════════════════════════════ */}
+        {/*       CREATE TASK MODAL         */}
+        {/* ════════════════════════════════ */}
+        {showCreateTask && (
+          <CreateTaskModal
+            projectId={projectId}
+            onClose={() => setShowCreateTask(false)}
+          />
+        )}
+
+        {/* ════════════════════════════════ */}
         {/*       TASK DETAIL MODAL         */}
         {/* ════════════════════════════════ */}
-        {/* Opens when user clicks any task card */}
         {selectedTask && (
           <TaskDetailModal
             task={selectedTask}
@@ -903,7 +717,6 @@ const Board = () => {
             onClose={() => setSelectedTask(null)}
           />
         )}
-
       </div>
     </div>
   )

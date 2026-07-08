@@ -16,8 +16,13 @@ const {
   updateTask,
   moveTask,
   deleteTask,
+  uploadAttachment,
+  deleteAttachment,
 } = require('../controllers/taskController')
 const { protect } = require('../middleware/authMiddleware')
+
+// Import multer config
+const upload = require('../config/multer')
 
 // All routes below require login
 // protect middleware runs on all routes in this file
@@ -55,5 +60,17 @@ router.route('/:id/tasks/:taskId')
 
 router.route('/:id/tasks/:taskId/move')
   .put(moveTask)         // PUT /api/projects/:id/tasks/:taskId/move
+
+// Attachment routes
+router.route('/:id/tasks/:taskId/attachments')
+  .post(
+    upload.single('attachment'),
+    // 'attachment' is the field name expected in the form
+    uploadAttachment
+  )
+
+router.route('/:id/tasks/:taskId/attachments/:attachmentId')
+  .delete(deleteAttachment)
+
 
 module.exports = router

@@ -17,29 +17,28 @@ const taskSchema = new mongoose.Schema(
       default: '',
     },
 
-    // Which project does this task belong to?
+    // Which project this task belongs to
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Project',
       required: true,
     },
 
-    // Who created this task?
+    // Who created this task
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
 
-    // Who is responsible for this task?
+    // Who is assigned to this task
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       default: null,
-      // null means unassigned
     },
 
-    // Task status — these are the columns on our Trello-like board
+    // Task status — matches board columns
     status: {
       type: String,
       enum: ['todo', 'in_progress', 'in_review', 'done'],
@@ -53,22 +52,19 @@ const taskSchema = new mongoose.Schema(
       default: 'medium',
     },
 
-    // Task due date
+    // Target/due date — when task should be completed
     dueDate: {
       type: Date,
       default: null,
     },
 
-    // Position of task in the column
-    // Used for drag and drop ordering
-    // Lower number = higher position
+    // Position in the column for drag and drop ordering
     position: {
       type: Number,
       default: 0,
     },
 
-    // Task labels/tags
-    // Example: ['bug', 'feature', 'urgent']
+    // Labels/tags for the task
     labels: [
       {
         type: String,
@@ -76,20 +72,52 @@ const taskSchema = new mongoose.Schema(
       },
     ],
 
-    // Attachments (file upload URLs)
+    // File attachments
+    // Each attachment has filename, original name, url, size, type
     attachments: [
       {
-        filename: String,
-        url: String,
+        // Unique filename stored on server (uuid generated)
+        filename: {
+          type: String,
+          required: true,
+        },
+        // Original filename uploaded by user
+        originalName: {
+          type: String,
+          required: true,
+        },
+        // URL to access the file
+        url: {
+          type: String,
+          required: true,
+        },
+        // File size in bytes
+        size: {
+          type: Number,
+          default: 0,
+        },
+        // File MIME type (image/png, application/pdf etc)
+        mimetype: {
+          type: String,
+          default: '',
+        },
+        // When was this attachment uploaded
         uploadedAt: {
           type: Date,
           default: Date.now,
+        },
+        // Who uploaded this attachment
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null,
         },
       },
     ],
   },
   {
     timestamps: true,
+    // Automatically adds createdAt and updatedAt
   }
 )
 

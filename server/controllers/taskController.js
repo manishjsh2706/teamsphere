@@ -246,10 +246,129 @@ const deleteTask = async (req, res) => {
   }
 }
 
+// @desc    Upload attachment to a task
+// @route   POST /api/projects/:id/tasks/:taskId/attachments
+// @access  Private (project members only)
+const uploadAttachment = async (req, res) => {
+  try {
+    // Check project membership
+    const { error, status } = await checkProjectMember(
+      req.params.id,
+      req.user._id
+    )
+    if (error) return res.status(status).json({ message: error })
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload a file' })
+    }
+
+    // Find the task
+    const task = await Task.findById(req.params.taskId)
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' })
+    }
+
+    // Build the attachment object
+    const attachment = {
+      filename: req.file.filename,
+      // UUID filename stored on disk
+      originalName: req.file.originalname,
+      // Original name user uploaded
+      url: `/uploads/attachments/${req.file.filename}`,
+      // URL to access the file
+      size: req.file.size,
+      // File size in bytes
+      mimetype: req.file.mimetype,
+      // File type
+      uploadedAt: new Date(),
+      uploadedBy: req.user._id,
+    }
+
+    // Add attachment to task
+    task.attachments.push(attachment)
+    await task.save()
+
+    // Populate user details
+    await task.populate('createdBy', 'name email avatar')
+    await task.populate('assignedTo', 'name email avatar')
+    await task.populate('attachments.uploadedBy', 'name email')
+
+    res.status(201).json({
+      message: 'Attachment uploaded successfully',
+      task,
+    })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+// @desc    Delete attachment from a task
+// @route   DELETE /api/projects/:id/tasks/:taskId/attachments/:attachmentId
+// @access  Private (uploader or project admin)
+const deleteAttachment = async (req, res) => {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+
+    // Check membership
+    const { error, status } = await checkProjectMember(
+      req.params.id,
+      req.user._id
+    )
+    if (error) return res.status(status).json({ message: error })
+
+    const task = await Task.findById(req.params.taskId)
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' })
+    }
+
+    // Find the attachment
+    const attachment = task.attachments.id(req.params.attachmentId)
+    if (!attachment) {
+      return res.status(404).json({ message: 'Attachment not found' })
+    }
+
+    // Check if user can delete this attachment
+    // Only uploader or project admin can delete
+    const isUploader =
+      attachment.uploadedBy?.toString() === req.user._id.toString()
+    const isSystemAdmin = req.user.role === 'admin'
+
+    if (!isUploader && !isSystemAdmin) {
+      return res.status(403).json({
+        message: 'Not authorized to delete this attachment',
+      })
+    }
+
+    // Delete file from disk
+    const filePath = path.join(
+      __dirname,
+      '../uploads/attachments',
+      attachment.filename
+    )
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+      // Delete file from server storage
+    }
+
+    // Remove attachment from task
+    task.attachments.pull(req.params.attachmentId)
+    await task.save()
+
+    res.json({ message: 'Attachment deleted successfully' })
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
 module.exports = {
   createTask,
   getTasks,
   updateTask,
   moveTask,
   deleteTask,
+  uploadAttachment,  // ✅ NEW
+  deleteAttachment, 
 }
