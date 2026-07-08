@@ -1,21 +1,19 @@
 import axios from 'axios'
 
-// Create axios instance with base URL
+// When running in Docker, nginx proxies /api to backend
+// When running locally, we call backend directly
+const baseURL =
+  import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL,
 })
 
-// Interceptor — runs before EVERY request automatically
-// Adds JWT token to header so backend knows user is logged in
 API.interceptors.request.use((config) => {
-  // Get user from localStorage
   const user = JSON.parse(localStorage.getItem('user'))
-
-  // If user exists and has token, add it to request header
   if (user?.token) {
     config.headers.Authorization = `Bearer ${user.token}`
   }
-
   return config
 })
 

@@ -1,0 +1,73 @@
+# docker-compose.yml
+# This file defines all our services (containers)
+# and how they work together
+
+version: '3.8'
+
+services:
+
+  # ─────────────────────────────────────────
+  # BACKEND SERVICE
+  # ─────────────────────────────────────────
+  server:
+    # Give this container a name
+    container_name: teamsphere-server
+
+    # Build from the server/Dockerfile
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+
+    # Map container port 5000 to host port 5000
+    # host:container
+    # So http://localhost:5000 works on your computer
+    ports:
+      - '5000:5000'
+
+    # Environment variables for the container
+    # These replace the .env file inside the container
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      # The ${} syntax reads from .env file
+      # in the same folder as docker-compose.yml
+
+    # Mount uploads folder so files persist
+    # even when container restarts
+    volumes:
+      - ./server/uploads:/app/uploads
+      # local path : container path
+
+    # Restart container if it crashes
+    restart: unless-stopped
+
+    # Health check — makes sure server is running
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:5000']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────
+  # FRONTEND SERVICE
+  # ─────────────────────────────────────────
+  client:
+    container_name: teamsphere-client
+
+    # Build from client/Dockerfile
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+
+    # Map container port 80 to host port 3000
+    # Access frontend at http://localhost:3000
+    ports:
+      - '3000:80'
+
+    # Client depends on server being ready first
+    depends_on:
+      - server
+
+    restart: unless-stopped
